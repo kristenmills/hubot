@@ -3,12 +3,14 @@ Log            = require 'log'
 Path           = require 'path'
 HttpClient     = require 'scoped-http-client'
 {EventEmitter} = require 'events'
+{inspect}      = require 'util'
+
 
 User = require './user'
 Brain = require './brain'
 Response = require './response'
-{Listener,TextListener} = require './listener'
-{EnterMessage,LeaveMessage,TopicMessage,CatchAllMessage} = require './message'
+{Listener} = require './listener'
+{EnterMessage,LeaveMessage,TextMessage,TopicMessage,CatchAllMessage} = require './message'
 
 HUBOT_DEFAULT_ADAPTERS = [
   'campfire'
@@ -67,6 +69,17 @@ class Robot
       @emit 'error', err
     process.on 'uncaughtException', @onUncaughtException
 
+  # Public: Adds a custom Listener with the provided matcher and callback
+  #
+  # matcher  - A Function that determines whether to call the callback.
+  #            Expected to return a boolean.
+  # callback - A Function that is called with a Response object if the
+  #            matcher function returns true.
+  #
+  # Returns nothing.
+  listen: (matcher, callback) ->
+    @listeners.push new Listener(@, matcher, callback)
+
   # Public: Adds a Listener that attempts to match incoming messages based on
   # a Regex.
   #
@@ -75,7 +88,16 @@ class Robot
   #
   # Returns nothing.
   hear: (regex, callback) ->
-    @listeners.push new TextListener(@, regex, callback)
+    @listen(
+      (message) ->
+        if message instanceof TextMessage
+          match = message.match(regex)
+          if match
+            @robot.logger.debug \
+              "Message '#{message}' matched regex /#{inspect regex}/"
+          match
+      callback
+    )
 
   # Public: Adds a Listener that attempts to match incoming messages directed
   # at the robot based on a Regex. All regexes treat patterns like they begin
@@ -110,7 +132,7 @@ class Robot
         modifiers
       )
 
-    @listeners.push new TextListener(@, newRegex, callback)
+    @hear(newRegex, callback)
 
   # Public: Adds a Listener that triggers when anyone enters the room.
   #
@@ -118,8 +140,7 @@ class Robot
   #
   # Returns nothing.
   enter: (callback) ->
-    @listeners.push new Listener(
-      @,
+    @listen(
       ((msg) -> msg instanceof EnterMessage),
       callback
     )
@@ -130,8 +151,7 @@ class Robot
   #
   # Returns nothing.
   leave: (callback) ->
-    @listeners.push new Listener(
-      @,
+    @listen(
       ((msg) -> msg instanceof LeaveMessage),
       callback
     )
@@ -142,8 +162,7 @@ class Robot
   #
   # Returns nothing.
   topic: (callback) ->
-    @listeners.push new Listener(
-      @,
+    @listen(
       ((msg) -> msg instanceof TopicMessage),
       callback
     )
@@ -178,8 +197,7 @@ class Robot
   #
   # Returns nothing.
   catchAll: (callback) ->
-    @listeners.push new Listener(
-      @,
+    @listen(
       ((msg) -> msg instanceof CatchAllMessage),
       ((msg) -> msg.message = msg.message.message; callback msg)
     )
