@@ -48,39 +48,39 @@ describe 'Robot', ->
 
     describe '#hear', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.hear /.*/, () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#respond', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.respond /.*/, () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#enter', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.enter () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#leave', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.leave () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#topic', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.topic () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#catchAll', ->
       it 'registers a new listener', ->
-        expect(@robot.listeners).to.have.length(0)
+        sinon.spy @robot, 'listen'
         @robot.catchAll () ->
-        expect(@robot.listeners).to.have.length(1)
+        expect(@robot.listen).to.have.been.called
 
     describe '#receive', ->
       it 'calls all registered listeners', ->
