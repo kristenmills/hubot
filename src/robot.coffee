@@ -108,6 +108,15 @@ class Robot
   #
   # Returns nothing.
   respond: (regex, callback) ->
+    @hear(@respondPattern(regex), callback)
+
+  # Private: Build a regular expression that matches messages addressed
+  # directly to the robot
+  #
+  # regex - A RegExp for the message part that follows the robot's name/alias
+  #
+  # Returns RegExp.
+  respondPattern: (regex) ->
     re = regex.toString().split('/')
     re.shift()
     modifiers = re.pop()
@@ -132,7 +141,7 @@ class Robot
         modifiers
       )
 
-    @hear(newRegex, callback)
+    return newRegex
 
   # Public: Adds a Listener that triggers when anyone enters the room.
   #
