@@ -99,6 +99,27 @@ class Robot
       callback
     )
 
+  # Public: Adds a Listener that attempts to match incoming messages based on
+  # a Regex, but rejects all messages that are addressed to the robot
+  # (i.e. anti-respond).
+  #
+  # regex    - A Regex that determines if the callback should be called.
+  # callback - A Function that is called with a Response object.
+  #
+  # Returns nothing.
+  eavesdrop: (regex, callback) ->
+    antiPattern = @respondPattern(/.*/)
+    @listen(
+      (message) ->
+        if message instanceof TextMessage and not message.match(antiPattern)
+          match = message.match(regex)
+          if match
+            @robot.logger.debug \
+              "Message '#{message}' matched regex /#{inspect regex}/"
+          match
+      callback
+    )
+
   # Public: Adds a Listener that attempts to match incoming messages directed
   # at the robot based on a Regex. All regexes treat patterns like they begin
   # with a '^'

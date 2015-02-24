@@ -58,6 +58,12 @@ describe 'Robot', ->
         @robot.respond /.*/, () ->
         expect(@robot.listen).to.have.been.called
 
+    describe '#eavesdrop', ->
+      it 'registers a new listener', ->
+        sinon.spy @robot, 'listen'
+        @robot.eavesdrop /.*/, () ->
+        expect(@robot.listen).to.have.been.called
+
     describe '#enter', ->
       it 'registers a new listener', ->
         sinon.spy @robot, 'listen'
@@ -249,6 +255,40 @@ describe 'Robot', ->
         testRegex = /.*/
 
         @robot.respond(testRegex, callback)
+        testListener = @robot.listeners[0]
+        result = testListener.matcher(testMessage)
+
+        expect(result).to.not.be.ok
+
+    describe '#eavesdrop', ->
+      it 'matches TextMessages not addressed to the robot', ->
+        callback = sinon.spy()
+        testMessage = new TextMessage(@user, 'message123')
+        testRegex = /message123/
+
+        @robot.eavesdrop(testRegex, callback)
+        testListener = @robot.listeners[0]
+        result = testListener.matcher(testMessage)
+
+        expect(result).to.be.ok
+
+      it 'does not match TextMessages addressed to the robot', ->
+        callback = sinon.spy()
+        testMessage = new TextMessage(@user, 'TestHubot message123')
+        testRegex = /message123/
+
+        @robot.eavesdrop(testRegex, callback)
+        testListener = @robot.listeners[0]
+        result = testListener.matcher(testMessage)
+
+        expect(result).to.not.be.ok
+
+      it 'does not match EnterMessages', ->
+        callback = sinon.spy()
+        testMessage = new EnterMessage(@user)
+        testRegex = /.*/
+
+        @robot.eavesdrop(testRegex, callback)
         testListener = @robot.listeners[0]
         result = testListener.matcher(testMessage)
 
