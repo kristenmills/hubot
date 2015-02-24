@@ -40,6 +40,12 @@ describe 'Robot', ->
    @robot.shutdown()
 
   describe 'Unit Tests', ->
+    describe '#listen', ->
+      it 'registers a new listener', ->
+        expect(@robot.listeners).to.have.length(0)
+        @robot.hear /.*/, () ->
+        expect(@robot.listeners).to.have.length(1)
+
     describe '#hear', ->
       it 'registers a new listener', ->
         expect(@robot.listeners).to.have.length(0)
@@ -191,6 +197,17 @@ describe 'Robot', ->
         expect(goodListenerCalled).to.be.ok
 
   describe 'Listener Registration', ->
+    describe '#listen', ->
+      it 'forwards the matcher and callback to Listener', ->
+        callback = sinon.spy()
+        matcher = sinon.spy()
+
+        @robot.listen(matcher, callback)
+        testListener = @robot.listeners[0]
+
+        expect(testListener.matcher).to.equal(matcher)
+        expect(testListener.callback).to.equal(callback)
+
     describe '#hear', ->
       it 'matches TextMessages', ->
         callback = sinon.spy()
