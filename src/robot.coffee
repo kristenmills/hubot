@@ -51,6 +51,7 @@ class Robot
     @listeners = []
     @logger    = new Log process.env.HUBOT_LOG_LEVEL or 'info'
     @pingIntervalId = null
+    @globalHttpOptions = {}
 
     @parseVersion()
     if httpd
@@ -63,8 +64,8 @@ class Robot
     @adapterName   = adapter
     @errorHandlers = []
 
-    @on 'error', (err, msg) =>
-      @invokeErrorHandlers(err, msg)
+    @on 'error', (err, res) =>
+      @invokeErrorHandlers(err, res)
     @onUncaughtException = (err) =>
       @emit 'error', err
     process.on 'uncaughtException', @onUncaughtException
@@ -77,17 +78,19 @@ class Robot
   #            matcher function returns true.
   #
   # Returns nothing.
-  listen: (matcher, callback) ->
-    @listeners.push new Listener(@, matcher, callback)
+  listen: (matcher, options, callback) ->
+    @listeners.push new Listener(@, matcher, options, callback)
 
   # Public: Adds a Listener that attempts to match incoming messages based on
   # a Regex.
   #
   # regex    - A Regex that determines if the callback should be called.
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  hear: (regex, callback) ->
+  hear: (regex, options, callback) ->
     @listen(
       (message) ->
         if message instanceof TextMessage
@@ -96,6 +99,7 @@ class Robot
             @robot.logger.debug \
               "Message '#{message}' matched regex /#{inspect regex}/"
           match
+      options
       callback
     )
 
@@ -107,7 +111,7 @@ class Robot
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  eavesdrop: (regex, callback) ->
+  eavesdrop: (regex, options, callback) ->
     antiPattern = @respondPattern(/.*/)
     @listen(
       (message) ->
@@ -117,6 +121,7 @@ class Robot
             @robot.logger.debug \
               "Message '#{message}' matched regex /#{inspect regex}/"
           match
+      options
       callback
     )
 
@@ -125,11 +130,13 @@ class Robot
   # with a '^'
   #
   # regex    - A Regex that determines if the callback should be called.
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  respond: (regex, callback) ->
-    @hear(@respondPattern(regex), callback)
+  respond: (regex, options, callback) ->
+    @hear(@respondPattern(regex), options, callback)
 
   # Private: Build a regular expression that matches messages addressed
   # directly to the robot
@@ -152,8 +159,9 @@ class Robot
 
     if @alias
       alias = @alias.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+      [a,b] = if name.length > alias.length then [name,alias] else [alias,name]
       newRegex = new RegExp(
-        "^\\s*[@]?(?:#{alias}[:,]?|#{name}[:,]?)\\s*(?:#{pattern})"
+        "^\\s*[@]?(?:#{a}[:,]?|#{b}[:,]?)\\s*(?:#{pattern})"
         modifiers
       )
     else
@@ -162,38 +170,47 @@ class Robot
         modifiers
       )
 
-    return newRegex
+    newRegex
 
   # Public: Adds a Listener that triggers when anyone enters the room.
   #
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  enter: (callback) ->
+  enter: (options, callback) ->
     @listen(
       ((msg) -> msg instanceof EnterMessage),
+      options,
       callback
     )
 
   # Public: Adds a Listener that triggers when anyone leaves the room.
   #
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  leave: (callback) ->
+  leave: (options, callback) ->
     @listen(
       ((msg) -> msg instanceof LeaveMessage),
+      options,
       callback
     )
 
   # Public: Adds a Listener that triggers when anyone changes the topic.
   #
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  topic: (callback) ->
+  topic: (options, callback) ->
     @listen(
       ((msg) -> msg instanceof TopicMessage),
+      options,
       callback
     )
 
@@ -210,25 +227,34 @@ class Robot
   # user emitted error events.
   #
   # err - An Error object.
-  # msg - An optional Response object that generated the error
+  # res - An optional Response object that generated the error
   #
   # Returns nothing.
-  invokeErrorHandlers: (err, msg) ->
+  invokeErrorHandlers: (err, res) ->
     @logger.error err.stack
     for errorHandler in @errorHandlers
      try
-       errorHandler(err, msg)
+       errorHandler(err, res)
      catch errErr
        @logger.error "while invoking error handler: #{errErr}\n#{errErr.stack}"
 
   # Public: Adds a Listener that triggers when no other text matchers match.
   #
+  # options  - An Object of additional parameters keyed on extension name
+  #            (optional).
   # callback - A Function that is called with a Response object.
   #
   # Returns nothing.
-  catchAll: (callback) ->
+  catchAll: (options, callback) ->
+    # `options` is optional; need to isolate the real callback before
+    # wrapping it with logic below
+    if not callback?
+      callback = options
+      options = {}
+
     @listen(
       ((msg) -> msg instanceof CatchAllMessage),
+      options,
       ((msg) -> msg.message = msg.message.message; callback msg)
     )
 
@@ -323,8 +349,11 @@ class Robot
     user    = process.env.EXPRESS_USER
     pass    = process.env.EXPRESS_PASSWORD
     stat    = process.env.EXPRESS_STATIC
+    port    = process.env.EXPRESS_PORT or process.env.PORT or 8080
+    address = process.env.EXPRESS_BIND_ADDRESS or process.env.BIND_ADDRESS or '0.0.0.0'
 
     express = require 'express'
+    multipart = require 'connect-multiparty'
 
     app = express()
 
@@ -334,11 +363,17 @@ class Robot
 
     app.use express.basicAuth user, pass if user and pass
     app.use express.query()
-    app.use express.bodyParser()
+
+    app.use express.json()
+    app.use express.urlencoded()
+    # replacement for deprecated express.multipart/connect.multipart
+    # limit to 100mb, as per the old behavior
+    app.use multipart(maxFilesSize: 100 * 1024 * 1024)
+
     app.use express.static stat if stat
 
     try
-      @server = app.listen(process.env.PORT || 8080, process.env.BIND_ADDRESS || '0.0.0.0')
+      @server = app.listen(port, address)
       @router = app
     catch err
       @logger.error "Error trying to start HTTP server: #{err}\n#{err.stack}"
@@ -539,7 +574,16 @@ class Robot
   #
   # Returns a ScopedClient instance.
   http: (url, options) ->
-    HttpClient.create(url, options)
+    HttpClient.create(url, @extend({}, @globalHttpOptions, options))
       .header('User-Agent', "Hubot/#{@version}")
+
+  # Private: Extend obj with objects passed as additional args.
+  #
+  # Returns the original object with updated changes.
+  extend: (obj, sources...) ->
+    for source in sources
+      obj[key] = value for own key, value of source
+    obj
+
 
 module.exports = Robot

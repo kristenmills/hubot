@@ -1,3 +1,45 @@
+v2.13.1
+=======
+
+* Fix documentation when running `hubot -c` to suggest correct usage of generator https://github.com/github/hubot/pull/938
+* Fix respond listeners matching when robot alias is a substring of robot name https://github.com/github/hubot/pull/927
+* Update bin/hubot to log a warning if called with non-existent options https://github.com/github/hubot/pull/931
+
+
+v2.13.0
+=======
+
+* Fix some website links
+* Link to Freenode channel (#hubot)
+* Fix license in package.json
+* Various documentation updates
+* More automated tests
+* Add support for global http options (see https://github.com/github/hubot/blob/master/docs/patterns.md#forwarding-all-http-requests-through-a-proxy for details)
+* Add support for listener metadata (see https://github.com/github/hubot/blob/master/docs/scripting.md#listener-metadata) for details
+* Document using npm search for finding scripts
+
+v2.12.0
+=======
+
+* Update scripting documentation to ref to `res` instead of `msg`, since it's a `Response` object
+* Update scoped-http-client from 0.10.0 to 0.10.3
+* Fix deprecation warnings from connect at startup
+
+v2.11.4
+=======
+
+* Fix shell adapter parsing history on node 0.8 (ie don't include newlines)
+
+v2.11.3
+=======
+
+* Fix issues around shell adapter throwing errors when there isn't a .hubot_history file
+
+v2.11.2
+=======
+
+* Add support for namespaced alternative environment variables for controlling the port and address express binds to (EXPRESS_PORT and EXPRESS_BIND_ADDRESS).
+
 v2.11.1
 =======
 
